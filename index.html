@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>序列帧合并器 — Sprite Sheet Maker</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: #111827;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ─── Header ─── */
+header {
+    background: #1f2937;
+    padding: 10px 18px;
+    border-bottom: 1px solid #374151;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+header .logo { font-size: 22px; }
+header h1 { font-size: 16px; font-weight: 700; color: #f87171; letter-spacing: 0.5px; }
+header .sub { font-size: 11px; color: #6b7280; margin-left: 2px; }
+
+/* ─── Main Layout ─── */
+.main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ─── Left Panel ─── */
+.left-panel {
+    width: 270px;
+    min-width: 200px;
+    background: #1f2937;
+    border-right: 1px solid #374151;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.drop-zone {
+    margin: 12px 12px 8px;
+    border: 2px dashed #374151;
+    border-radius: 10px;
+    padding: 18px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    user-select: none;
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: #f87171;
+    background: rgba(248, 113, 113, 0.05);
+}
+.drop-zone .dz-icon { font-size: 26px; margin-bottom: 6px; }
+.drop-zone .dz-title { font-size: 13px; color: #d1d5db; }
+.drop-zone .dz-hint { font-size: 11px; color: #6b7280; margin-top: 3px; }
+
+.add-btn {
+    margin: 0 12px 10px;
+    padding: 8px;
+    background: #f87171;
+    border: none;
+    border-radius: 7px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    width: calc(100% - 24px);
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+.add-btn:hover { background: #ef4444; }
+
+.list-header {
+    padding: 6px 12px 4px;
+    font-size: 11px;
+    color: #6b7280;
+    border-top: 1px solid #374151;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+.clear-btn {
+    font-size: 11px;
+    color: #f87171;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+.clear-btn:hover { background: rgba(248,113,113,0.1); }
+
+.image-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px 10px;
+}
+
+.image-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 7px;
+    border-radius: 7px;
+    margin-bottom: 3px;
+    background: #111827;
+    transition: background 0.15s;
+}
+.image-item:hover { background: #1e3a5a; }
+.image-item .idx {
+    font-size: 10px;
+    color: #6b7280;
+    width: 18px;
+    text-align: right;
+    flex-shrink: 0;
+}
+.image-item .thumb {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: repeating-conic-gradient(#222 0% 25%, #333 0% 50%) 0 0 / 8px 8px;
+    flex-shrink: 0;
+}
+.image-item .info { flex: 1; min-width: 0; }
+.image-item .info .iname {
+    font-size: 11px;
+    color: #d1d5db;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.image-item .info .isize { font-size: 10px; color: #6b7280; margin-top: 1px; }
+.image-item .del-btn {
+    background: none;
+    border: none;
+    color: #4b5563;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 2px 3px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+.image-item .del-btn:hover { color: #f87171; }
+
+/* ─── Right Panel ─── */
+.right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ─── Settings Bar ─── */
+.settings-bar {
+    background: #1f2937;
+    border-bottom: 1px solid #374151;
+    padding: 8px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Toggle */
+.toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    user-select: none;
+}
+.toggle-wrap span { font-size: 12px; color: #9ca3af; }
+.toggle-input { display: none; }
+.toggle-track {
+    width: 38px;
+    height: 21px;
+    background: #374151;
+    border-radius: 11px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+.toggle-track::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    background: #9ca3af;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: left 0.2s, background 0.2s;
+}
+.toggle-input:checked + .toggle-track { background: rgba(248,113,113,0.25); }
+.toggle-input:checked + .toggle-track::after { left: 20px; background: #f87171; }
+
+/* Grid inputs */
+.sg { display: flex; align-items: center; gap: 6px; }
+.sg label { font-size: 12px; color: #9ca3af; white-space: nowrap; }
+.sg input[type="number"] {
+    width: 58px;
+    padding: 4px 6px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 5px;
+    color: #e0e0e0;
+    font-size: 12px;
+}
+.sg input[type="number"]:focus { outline: none; border-color: #f87171; }
+
+.chip {
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 5px;
+    padding: 4px 9px;
+    font-size: 11px;
+    color: #60a5fa;
+    white-space: nowrap;
+}
+
+/* ─── Preview Area ─── */
+.preview-area {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: repeating-conic-gradient(#1a1a1a 0% 25%, #222 0% 50%) 0 0 / 20px 20px;
+    padding: 20px;
+}
+.empty-state {
+    text-align: center;
+    color: #4b5563;
+    user-select: none;
+}
+.empty-state .es-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 13px; }
+
+.preview-wrap {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+}
+#previewCanvas { display: block; }
+
+/* ─── Export Bar ─── */
+.export-bar {
+    background: #1f2937;
+    border-top: 1px solid #374151;
+    padding: 9px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.export-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 180px;
+}
+.export-field label { font-size: 11px; color: #6b7280; white-space: nowrap; }
+.export-field input {
+    flex: 1;
+    padding: 5px 8px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 5px;
+    color: #6b7280;
+    font-size: 11px;
+    cursor: default;
+}
+.export-hint {
+    font-size: 10px;
+    color: #4b5563;
+    white-space: nowrap;
+    align-self: center;
+}
+.export-btn {
+    padding: 8px 22px;
+    background: #f87171;
+    border: none;
+    border-radius: 7px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: background 0.2s, opacity 0.2s;
+    flex-shrink: 0;
+}
+.export-btn:hover:not(:disabled) { background: #ef4444; }
+.export-btn:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+
+/* ─── Toast ─── */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-left: 4px solid #f87171;
+    border-radius: 7px;
+    padding: 11px 15px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #e0e0e0;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    z-index: 9999;
+    max-width: 300px;
+    opacity: 0;
+    transform: translateX(16px);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    white-space: pre-line;
+}
+.toast.show { opacity: 1; transform: translateX(0); }
+.toast.success { border-left-color: #34d399; }
+.toast.error { border-left-color: #f87171; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+</style>
+</head>
+<body>
+
+<header>
+    <span class="logo">🎞</span>
+    <h1>序列帧合并器</h1>
+    <span class="sub">Sprite Sheet Maker</span>
+</header>
+
+<div class="main">
+
+    <!-- ── Left Panel ── -->
+    <div class="left-panel">
+        <div class="drop-zone" id="dropZone">
+            <div class="dz-icon">📂</div>
+            <div class="dz-title">拖放图片到这里</div>
+            <div class="dz-hint">或点击此区域 / 使用下方按钮</div>
+        </div>
+        <button class="add-btn" id="addBtn">+ 添加图片</button>
+        <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
+
+        <div class="list-header">
+            <span id="countLabel">0 张图片</span>
+            <button class="clear-btn" id="clearBtn">清空</button>
+        </div>
+        <div class="image-list" id="imageList"></div>
+    </div>
+
+    <!-- ── Right Panel ── -->
+    <div class="right-panel">
+
+        <!-- Settings -->
+        <div class="settings-bar">
+
+            <label class="toggle-wrap" title="开启后将裁剪每张图片四周的透明像素，使序列图更紧凑">
+                <input type="checkbox" class="toggle-input" id="trimToggle" checked>
+                <span class="toggle-track"></span>
+                <span>自动裁剪透明边距</span>
+            </label>
+
+            <div class="sg">
+                <label>列</label>
+                <input type="number" id="colsInput" min="1" placeholder="自动" title="留空则自动计算">
+                <label>行</label>
+                <input type="number" id="rowsInput" min="1" placeholder="自动" title="留空则自动计算">
+            </div>
+
+            <div class="chip" id="layoutChip">— 布局 —</div>
+            <div class="chip" id="sizeChip">— 尺寸 —</div>
+
+        </div>
+
+        <!-- Preview -->
+        <div class="preview-area" id="previewArea">
+            <div class="empty-state" id="emptyState">
+                <div class="es-icon">🖼</div>
+                <p>添加图片后将在此处实时预览序列图</p>
+            </div>
+            <div class="preview-wrap" id="previewWrap" style="display:none">
+                <canvas id="previewCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Export -->
+        <div class="export-bar">
+            <div class="export-field">
+                <label>上次路径</label>
+                <input type="text" id="lastPathInput" readonly
+                    placeholder="首次保存后将在此显示文件名">
+            </div>
+            <span class="export-hint" title="受浏览器安全限制，路径记忆仅显示文件名。完整路径请在保存对话框中选择。">⚠ 路径由系统对话框决定</span>
+            <button class="export-btn" id="exportBtn" disabled>导出 PNG</button>
+        </div>
+
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════
+//  State
+// ════════════════════════════════════════════════════════════
+const state = {
+    images: [],        // { file, name, url, img, origW, origH }
+    outputCanvas: null,
+    cellW: 0,
+    cellH: 0,
+    rows: 0,
+    cols: 0,
+};
+
+// ════════════════════════════════════════════════════════════
+//  DOM refs
+// ════════════════════════════════════════════════════════════
+const dropZone      = document.getElementById('dropZone');
+const fileInput     = document.getElementById('fileInput');
+const addBtn        = document.getElementById('addBtn');
+const clearBtn      = document.getElementById('clearBtn');
+const imageList     = document.getElementById('imageList');
+const countLabel    = document.getElementById('countLabel');
+const trimToggle    = document.getElementById('trimToggle');
+const colsInput     = document.getElementById('colsInput');
+const rowsInput     = document.getElementById('rowsInput');
+const layoutChip    = document.getElementById('layoutChip');
+const sizeChip      = document.getElementById('sizeChip');
+const previewArea   = document.getElementById('previewArea');
+const emptyState    = document.getElementById('emptyState');
+const previewWrap   = document.getElementById('previewWrap');
+const previewCanvas = document.getElementById('previewCanvas');
+const exportBtn     = document.getElementById('exportBtn');
+const lastPathInput = document.getElementById('lastPathInput');
+const toast         = document.getElementById('toast');
+
+// ════════════════════════════════════════════════════════════
+//  Init — restore last saved filename
+// ════════════════════════════════════════════════════════════
+(function init() {
+    const saved = localStorage.getItem('ssm_lastFile');
+    if (saved) lastPathInput.value = saved;
+})();
+
+// ════════════════════════════════════════════════════════════
+//  Drag & Drop
+// ════════════════════════════════════════════════════════════
+dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+    if (files.length) addFiles(files);
+});
+dropZone.addEventListener('click', () => fileInput.click());
+addBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) addFiles([...fileInput.files]);
+    fileInput.value = '';
+});
+
+// ════════════════════════════════════════════════════════════
+//  Clear
+// ════════════════════════════════════════════════════════════
+clearBtn.addEventListener('click', () => {
+    state.images.forEach(e => URL.revokeObjectURL(e.url));
+    state.images = [];
+    renderList();
+    scheduleRebuild();
+});
+
+// ════════════════════════════════════════════════════════════
+//  Add Files
+// ════════════════════════════════════════════════════════════
+async function addFiles(files) {
+    const entries = await Promise.all(files.map(loadEntry));
+    for (const e of entries) {
+        if (e) state.images.push(e);
+    }
+    naturalSort(state.images);
+    renderList();
+    scheduleRebuild();
+}
+
+function loadEntry(file) {
+    return new Promise(resolve => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => resolve({
+            file, name: file.name, url, img,
+            origW: img.naturalWidth,
+            origH: img.naturalHeight,
+        });
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+    });
+}
+
+// ════════════════════════════════════════════════════════════
+//  Natural Sort  (1, 2, 10  not  1, 10, 2)
+// ════════════════════════════════════════════════════════════
+function naturalSort(arr) {
+    arr.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+// ════════════════════════════════════════════════════════════
+//  Render Image List
+// ════════════════════════════════════════════════════════════
+function renderList() {
+    countLabel.textContent = `${state.images.length} 张图片`;
+    imageList.innerHTML = '';
+    state.images.forEach((entry, i) => {
+        const item = document.createElement('div');
+        item.className = 'image-item';
+        item.innerHTML = `
+            <span class="idx">${i + 1}</span>
+            <img class="thumb" src="${entry.url}" alt="">
+            <div class="info">
+                <div class="iname" title="${entry.name}">${entry.name}</div>
+                <div class="isize">${entry.origW} × ${entry.origH}</div>
+            </div>
+            <button class="del-btn" data-i="${i}" title="移除">✕</button>
+        `;
+        imageList.appendChild(item);
+    });
+    imageList.querySelectorAll('.del-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const i = parseInt(btn.dataset.i, 10);
+            URL.revokeObjectURL(state.images[i].url);
+            state.images.splice(i, 1);
+            renderList();
+            scheduleRebuild();
+        });
+    });
+}
+
+// ════════════════════════════════════════════════════════════
+//  Auto Trim — returns bounding box of non-transparent pixels
+// ════════════════════════════════════════════════════════════
+function getTrimBounds(img) {
+    const c = document.createElement('canvas');
+    c.width  = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height).data;
+
+    let minX = c.width, maxX = -1, minY = c.height, maxY = -1;
+    for (let y = 0; y < c.height; y++) {
+        for (let x = 0; x < c.width; x++) {
+            if (data[(y * c.width + x) * 4 + 3] > 0) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+    // Fully transparent → use full image
+    if (maxX < 0) return { x: 0, y: 0, w: c.width, h: c.height };
+    return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+// ════════════════════════════════════════════════════════════
+//  Optimal Grid  — minimise |aspect_ratio - 1|
+// ════════════════════════════════════════════════════════════
+function calcOptimalGrid(n, cellW, cellH) {
+    if (n <= 0) return { rows: 0, cols: 0 };
+    if (n === 1) return { rows: 1, cols: 1 };
+    let bestRows = 1, bestCols = n, bestScore = Infinity;
+    for (let rows = 1; rows <= n; rows++) {
+        const cols = Math.ceil(n / rows);
+        const totalW = cols * cellW;
+        const totalH = rows * cellH;
+        const score = Math.abs(totalW / totalH - 1);
+        if (score < bestScore) {
+            bestScore = score;
+            bestRows = rows;
+            bestCols = cols;
+        }
+    }
+    return { rows: bestRows, cols: bestCols };
+}
+
+// ════════════════════════════════════════════════════════════
+//  Rebuild (debounced)
+// ════════════════════════════════════════════════════════════
+let rebuildTimer = null;
+function scheduleRebuild() {
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(rebuild, 60);
+}
+
+function rebuild() {
+    const n = state.images.length;
+    if (n === 0) {
+        emptyState.style.display = '';
+        previewWrap.style.display = 'none';
+        exportBtn.disabled = true;
+        layoutChip.textContent = '— 布局 —';
+        sizeChip.textContent   = '— 尺寸 —';
+        state.outputCanvas = null;
+        return;
+    }
+
+    const doTrim = trimToggle.checked;
+
+    // 1. Compute trim bounds per image
+    const bounds = state.images.map(e =>
+        doTrim
+            ? getTrimBounds(e.img)
+            : { x: 0, y: 0, w: e.origW, h: e.origH }
+    );
+
+    // 2. Cell size = max of all (trimmed) sizes
+    let cellW = 0, cellH = 0;
+    bounds.forEach(b => {
+        if (b.w > cellW) cellW = b.w;
+        if (b.h > cellH) cellH = b.h;
+    });
+    if (cellW === 0 || cellH === 0) return;
+
+    // 3. Grid layout
+    const manualCols = parseInt(colsInput.value) || 0;
+    const manualRows = parseInt(rowsInput.value) || 0;
+    let rows, cols;
+    if (manualCols > 0 && manualRows > 0) {
+        rows = manualRows;  cols = manualCols;
+    } else if (manualCols > 0) {
+        cols = manualCols;  rows = Math.ceil(n / cols);
+    } else if (manualRows > 0) {
+        rows = manualRows;  cols = Math.ceil(n / rows);
+    } else {
+        const opt = calcOptimalGrid(n, cellW, cellH);
+        rows = opt.rows;  cols = opt.cols;
+    }
+
+    state.cellW = cellW;
+    state.cellH = cellH;
+    state.rows  = rows;
+    state.cols  = cols;
+
+    const canvasW = cols * cellW;
+    const canvasH = rows * cellH;
+
+    // 4. Composite onto output canvas (transparent background)
+    const output = document.createElement('canvas');
+    output.width  = canvasW;
+    output.height = canvasH;
+    const ctx = output.getContext('2d');
+    // No fillRect → transparent background
+
+    state.images.forEach((entry, i) => {
+        const row  = Math.floor(i / cols);
+        const col  = i % cols;
+        const b    = bounds[i];
+
+        // Scale down if image (after trim) is larger than cell
+        let drawW = b.w, drawH = b.h;
+        if (drawW > cellW || drawH > cellH) {
+            const scale = Math.min(cellW / drawW, cellH / drawH);
+            drawW = Math.round(drawW * scale);
+            drawH = Math.round(drawH * scale);
+        }
+
+        // Centre within cell
+        const destX = col * cellW + Math.floor((cellW - drawW) / 2);
+        const destY = row * cellH + Math.floor((cellH - drawH) / 2);
+
+        ctx.drawImage(entry.img, b.x, b.y, b.w, b.h, destX, destY, drawW, drawH);
+    });
+
+    state.outputCanvas = output;
+
+    // 5. Update chips
+    layoutChip.textContent = `${cols} 列 × ${rows} 行  (${n} 帧)`;
+    sizeChip.textContent   = `${canvasW} × ${canvasH} px  |  每格 ${cellW} × ${cellH}`;
+
+    // 6. Scale preview to fit
+    const maxPW = previewArea.clientWidth  - 40;
+    const maxPH = previewArea.clientHeight - 40;
+    const scale = Math.min(1, maxPW / canvasW, maxPH / canvasH);
+    previewCanvas.width  = Math.round(canvasW * scale);
+    previewCanvas.height = Math.round(canvasH * scale);
+    const pCtx = previewCanvas.getContext('2d');
+    pCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    pCtx.drawImage(output, 0, 0, previewCanvas.width, previewCanvas.height);
+
+    emptyState.style.display  = 'none';
+    previewWrap.style.display = '';
+    exportBtn.disabled        = false;
+}
+
+// ════════════════════════════════════════════════════════════
+//  Settings → Rebuild
+// ════════════════════════════════════════════════════════════
+trimToggle.addEventListener('change', scheduleRebuild);
+colsInput.addEventListener('input',   scheduleRebuild);
+rowsInput.addEventListener('input',   scheduleRebuild);
+
+// Rebuild on window resize (preview rescaling)
+let resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(rebuild, 200);
+});
+
+// ════════════════════════════════════════════════════════════
+//  Export
+// ════════════════════════════════════════════════════════════
+exportBtn.addEventListener('click', async () => {
+    if (!state.outputCanvas) return;
+
+    // Fallback for browsers without File System Access API (e.g. Firefox)
+    if (!window.showSaveFilePicker) {
+        const link = document.createElement('a');
+        link.download = 'spritesheet.png';
+        link.href = state.outputCanvas.toDataURL('image/png');
+        link.click();
+        showToast('已下载到浏览器默认下载目录\n（文件名可在浏览器下载栏修改）', 'success');
+        return;
+    }
+
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: 'spritesheet.png',
+            types: [{
+                description: 'PNG 图片',
+                accept: { 'image/png': ['.png'] },
+            }],
+        });
+
+        // Write blob
+        const blob = await new Promise(resolve =>
+            state.outputCanvas.toBlob(resolve, 'image/png')
+        );
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+
+        // Remember filename (full path is inaccessible by browser security design)
+        lastPathInput.value = handle.name;
+        localStorage.setItem('ssm_lastFile', handle.name);
+
+        showToast(
+            `已保存：${handle.name}\n` +
+            `布局：${state.cols} × ${state.rows}  |  ` +
+            `${state.outputCanvas.width} × ${state.outputCanvas.height} px`,
+            'success'
+        );
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            showToast('导出失败：' + err.message, 'error');
+        }
+    }
+});
+
+// ════════════════════════════════════════════════════════════
+//  Toast
+// ════════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg, type = '') {
+    toast.textContent = msg;
+    toast.className = `toast show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>
